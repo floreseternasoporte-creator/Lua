@@ -96,6 +96,7 @@ local RE_ClashUpdate  = makeRemote("ClashUpdate")
 --===========================================================
 local squares      = {}
 local squareParts  = {}
+local squareTriggers = {}
 local padStations  = {}
 local arenaData    = {}
 
@@ -670,6 +671,31 @@ local function createPadStation(idx, data)
 	padLight.Range      = 18
 	padLight.Parent     = pad
 
+	-- Trigger volume (separate from visuals) so joining works reliably on all devices
+	local trigger = makePart(
+		"DuelPadTrigger_"..idx,
+		Vector3.new(12, 6, 12),
+		CFrame.new(data.pos + Vector3.new(0, 3, 0)),
+		"Really black",
+		Enum.Material.SmoothPlastic,
+		LobbyModel,
+		false,
+		true
+	)
+	trigger.Transparency = 1
+	trigger.CanTouch = true
+	squareTriggers[idx] = trigger
+
+	-- Floating beacon for easy discovery from far camera angles
+	local beacon = makePart("PadBeacon_"..idx, Vector3.new(1.2, 14, 1.2), CFrame.new(data.pos + Vector3.new(0, 7, 0)), "White", Enum.Material.Neon, LobbyModel, false, true)
+	beacon.Color = Color3.fromRGB(255, 215, 0)
+	beacon.Transparency = 0.3
+	local beaconLight = Instance.new("PointLight")
+	beaconLight.Color = Color3.fromRGB(255, 215, 0)
+	beaconLight.Brightness = 2.2
+	beaconLight.Range = 20
+	beaconLight.Parent = beacon
+
 	-- Thin glowing border frame
 	for _, side in ipairs({
 		{ size = Vector3.new(11, 0.2, 0.4),  offset = Vector3.new(0, 0.1,  5.5) },
@@ -758,6 +784,7 @@ local function createPadStation(idx, data)
 
 	padStations[idx] = {
 		part   = pad,
+		beacon = beacon,
 		sign   = sign,
 		title  = title,
 		status = status,
@@ -773,6 +800,7 @@ local function updatePadStation(idx)
 	local sq  = squares[idx]
 	local st  = padStations[idx]
 	local pad = squareParts[idx]
+	local beacon = st and st.beacon
 	if not sq or not st or not pad then return end
 
 	local goldColor = Color3.fromRGB(255, 215, 0)
@@ -781,26 +809,46 @@ local function updatePadStation(idx)
 	if sq.inBattle then
 		pad.Transparency = 0.15
 		pad.Color = redColor
+		if beacon then
+			beacon.Color = redColor
+			beacon.Transparency = 0.22
+		end
 		st.status.Text      = "⚔ EN BATALLA"
 		st.status.TextColor3 = redColor
 	elseif sq.countdown then
 		pad.Transparency = 0.12
 		pad.Color = Color3.fromRGB(255, 150, 0)
+		if beacon then
+			beacon.Color = Color3.fromRGB(255, 160, 0)
+			beacon.Transparency = 0.2
+		end
 		st.status.Text      = "⏳ PREPARANDO..."
 		st.status.TextColor3 = Color3.fromRGB(255, 200, 0)
 	elseif #sq.players == 0 then
 		pad.Transparency = 0.22
 		pad.Color = goldColor
+		if beacon then
+			beacon.Color = goldColor
+			beacon.Transparency = 0.3
+		end
 		st.status.Text      = "0/2 · TOCA PARA UNIRTE"
 		st.status.TextColor3 = Color3.fromRGB(200, 200, 200)
 	elseif #sq.players == 1 then
 		pad.Transparency = 0.10
 		pad.Color = Color3.fromRGB(100, 255, 100)
+		if beacon then
+			beacon.Color = Color3.fromRGB(100, 255, 100)
+			beacon.Transparency = 0.18
+		end
 		st.status.Text      = "1/2 · ESPERANDO..."
 		st.status.TextColor3 = Color3.fromRGB(100, 255, 100)
 	else
 		pad.Transparency = 0.08
 		pad.Color = Color3.fromRGB(255, 255, 100)
+		if beacon then
+			beacon.Color = Color3.fromRGB(255, 255, 100)
+			beacon.Transparency = 0.12
+		end
 		st.status.Text      = "2/2 · ¡LISTOS!"
 		st.status.TextColor3 = Color3.fromRGB(255, 255, 255)
 	end
@@ -1566,7 +1614,8 @@ end
 -- TOUCH PADS
 --===========================================================
 for i, sqPart in ipairs(squareParts) do
-	sqPart.Touched:Connect(function(hit)
+	local touchPart = squareTriggers[i] or sqPart
+	touchPart.Touched:Connect(function(hit)
 		local char   = hit and hit.Parent
 		local player = char and Players:GetPlayerFromCharacter(char)
 		if not player then return end
