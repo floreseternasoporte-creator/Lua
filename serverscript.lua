@@ -41,12 +41,16 @@ local HOUSES = {
 	{ name = "Hufflepuff", primary = "Bright yellow", neon = Color3.fromRGB(220,190,0),   badge = "🦡", sigil = Color3.fromRGB(30,30,30) },
 }
 
--- Pads más juntos cerca de las paredes del lobby
+-- Pad positions intentionally near spawn center so they are always visible (mobile + streaming)
+local PAD_X = 24
+local PAD_Z = 16
+local PAD_Y = 3.6
+local SIGN_Y = 18
 local PAD_DATA = {
-	{ pos = Vector3.new(-55, 3.6, -30), house = HOUSES[1], signPos = Vector3.new(-55, 22, -46.5), signLook = Vector3.new(-55, 22, -30) },
-	{ pos = Vector3.new( 55, 3.6, -30), house = HOUSES[2], signPos = Vector3.new( 55, 22, -46.5), signLook = Vector3.new( 55, 22, -30) },
-	{ pos = Vector3.new(-55, 3.6,  30), house = HOUSES[3], signPos = Vector3.new(-55, 22,  46.5), signLook = Vector3.new(-55, 22,  30) },
-	{ pos = Vector3.new( 55, 3.6,  30), house = HOUSES[4], signPos = Vector3.new( 55, 22,  46.5), signLook = Vector3.new( 55, 22,  30) },
+	{ pos = Vector3.new(-PAD_X, PAD_Y, -PAD_Z), house = HOUSES[1], signPos = Vector3.new(-PAD_X, SIGN_Y, -44), signLook = Vector3.new(-PAD_X, SIGN_Y, -PAD_Z) },
+	{ pos = Vector3.new( PAD_X, PAD_Y, -PAD_Z), house = HOUSES[2], signPos = Vector3.new( PAD_X, SIGN_Y, -44), signLook = Vector3.new( PAD_X, SIGN_Y, -PAD_Z) },
+	{ pos = Vector3.new(-PAD_X, PAD_Y,  PAD_Z), house = HOUSES[3], signPos = Vector3.new(-PAD_X, SIGN_Y,  44), signLook = Vector3.new(-PAD_X, SIGN_Y,  PAD_Z) },
+	{ pos = Vector3.new( PAD_X, PAD_Y,  PAD_Z), house = HOUSES[4], signPos = Vector3.new( PAD_X, SIGN_Y,  44), signLook = Vector3.new( PAD_X, SIGN_Y,  PAD_Z) },
 }
 
 local ARENA_CENTERS = {
@@ -96,6 +100,7 @@ local RE_ClashUpdate  = makeRemote("ClashUpdate")
 --===========================================================
 local squares      = {}
 local squareParts  = {}
+local squareTriggers = {}
 local padStations  = {}
 local arenaData    = {}
 
@@ -654,14 +659,46 @@ for i, pd in ipairs(PAD_DATA) do
 end
 
 --===========================================================
--- PAD STATIONS — only glow border, transparent center
+-- PAD STATIONS — high-visibility duel pads + status signs
 --===========================================================
 local function createPadStation(idx, data)
-	-- Transparent floor tile (just a glow ring)
-	local pad = makePart("DuelPad_"..idx, Vector3.new(11, 0.15, 11), CFrame.new(data.pos), "White", Enum.Material.Neon, LobbyModel, false, true)
-	pad.Transparency = 0.75 -- mostly transparent, slight glow
+	-- Base tile: clearly visible so players can find where to stand
+	local pad = makePart("DuelPad_"..idx, Vector3.new(11, 0.25, 11), CFrame.new(data.pos), "White", Enum.Material.Neon, LobbyModel, false, true)
+	pad.Transparency = 0.22 -- visible from far away, still keeps glow style
 	pad.Color        = Color3.fromRGB(255, 215, 0)
+	pad.CanTouch     = true
 	squareParts[idx] = pad
+
+	local padLight = Instance.new("PointLight")
+	padLight.Color      = Color3.fromRGB(255, 215, 0)
+	padLight.Brightness = 1.6
+	padLight.Range      = 18
+	padLight.Parent     = pad
+
+	-- Trigger volume (separate from visuals) so joining works reliably on all devices
+	local trigger = makePart(
+		"DuelPadTrigger_"..idx,
+		Vector3.new(12, 6, 12),
+		CFrame.new(data.pos + Vector3.new(0, 3, 0)),
+		"Really black",
+		Enum.Material.SmoothPlastic,
+		LobbyModel,
+		false,
+		true
+	)
+	trigger.Transparency = 1
+	trigger.CanTouch = true
+	squareTriggers[idx] = trigger
+
+	-- Floating beacon for easy discovery from far camera angles
+	local beacon = makePart("PadBeacon_"..idx, Vector3.new(1.2, 14, 1.2), CFrame.new(data.pos + Vector3.new(0, 7, 0)), "White", Enum.Material.Neon, LobbyModel, false, true)
+	beacon.Color = Color3.fromRGB(255, 215, 0)
+	beacon.Transparency = 0.3
+	local beaconLight = Instance.new("PointLight")
+	beaconLight.Color = Color3.fromRGB(255, 215, 0)
+	beaconLight.Brightness = 2.2
+	beaconLight.Range = 20
+	beaconLight.Parent = beacon
 
 	-- Thin glowing border frame
 	for _, side in ipairs({
@@ -672,7 +709,7 @@ local function createPadStation(idx, data)
 	}) do
 		local edge = makePart("PadEdge_"..idx, side.size, CFrame.new(data.pos + side.offset), "White", Enum.Material.Neon, LobbyModel, false, true)
 		edge.Color       = Color3.fromRGB(255, 215, 0)
-		edge.Transparency = 0.0
+		edge.Transparency = 0.08
 		local edgeLight = Instance.new("PointLight")
 		edgeLight.Color      = Color3.fromRGB(255, 215, 0)
 		edgeLight.Brightness = 2
@@ -751,6 +788,7 @@ local function createPadStation(idx, data)
 
 	padStations[idx] = {
 		part   = pad,
+		beacon = beacon,
 		sign   = sign,
 		title  = title,
 		status = status,
@@ -766,29 +804,55 @@ local function updatePadStation(idx)
 	local sq  = squares[idx]
 	local st  = padStations[idx]
 	local pad = squareParts[idx]
+	local beacon = st and st.beacon
 	if not sq or not st or not pad then return end
 
 	local goldColor = Color3.fromRGB(255, 215, 0)
 	local redColor  = Color3.fromRGB(255, 50, 50)
 
 	if sq.inBattle then
+		pad.Transparency = 0.15
 		pad.Color = redColor
+		if beacon then
+			beacon.Color = redColor
+			beacon.Transparency = 0.22
+		end
 		st.status.Text      = "⚔ EN BATALLA"
 		st.status.TextColor3 = redColor
 	elseif sq.countdown then
+		pad.Transparency = 0.12
 		pad.Color = Color3.fromRGB(255, 150, 0)
+		if beacon then
+			beacon.Color = Color3.fromRGB(255, 160, 0)
+			beacon.Transparency = 0.2
+		end
 		st.status.Text      = "⏳ PREPARANDO..."
 		st.status.TextColor3 = Color3.fromRGB(255, 200, 0)
 	elseif #sq.players == 0 then
+		pad.Transparency = 0.22
 		pad.Color = goldColor
+		if beacon then
+			beacon.Color = goldColor
+			beacon.Transparency = 0.3
+		end
 		st.status.Text      = "0/2 · TOCA PARA UNIRTE"
 		st.status.TextColor3 = Color3.fromRGB(200, 200, 200)
 	elseif #sq.players == 1 then
+		pad.Transparency = 0.10
 		pad.Color = Color3.fromRGB(100, 255, 100)
+		if beacon then
+			beacon.Color = Color3.fromRGB(100, 255, 100)
+			beacon.Transparency = 0.18
+		end
 		st.status.Text      = "1/2 · ESPERANDO..."
 		st.status.TextColor3 = Color3.fromRGB(100, 255, 100)
 	else
+		pad.Transparency = 0.08
 		pad.Color = Color3.fromRGB(255, 255, 100)
+		if beacon then
+			beacon.Color = Color3.fromRGB(255, 255, 100)
+			beacon.Transparency = 0.12
+		end
 		st.status.Text      = "2/2 · ¡LISTOS!"
 		st.status.TextColor3 = Color3.fromRGB(255, 255, 255)
 	end
@@ -1554,7 +1618,8 @@ end
 -- TOUCH PADS
 --===========================================================
 for i, sqPart in ipairs(squareParts) do
-	sqPart.Touched:Connect(function(hit)
+	local touchPart = squareTriggers[i] or sqPart
+	touchPart.Touched:Connect(function(hit)
 		local char   = hit and hit.Parent
 		local player = char and Players:GetPlayerFromCharacter(char)
 		if not player then return end
