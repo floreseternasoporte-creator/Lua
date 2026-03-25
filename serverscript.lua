@@ -41,12 +41,16 @@ local HOUSES = {
 	{ name = "Hufflepuff", primary = "Bright yellow", neon = Color3.fromRGB(220,190,0),   badge = "🦡", sigil = Color3.fromRGB(30,30,30) },
 }
 
--- Pads más juntos cerca de las paredes del lobby
+-- Pad positions intentionally near spawn center so they are always visible (mobile + streaming)
+local PAD_X = 24
+local PAD_Z = 16
+local PAD_Y = 3.6
+local SIGN_Y = 18
 local PAD_DATA = {
-	{ pos = Vector3.new(-55, 3.6, -30), house = HOUSES[1], signPos = Vector3.new(-55, 22, -46.5), signLook = Vector3.new(-55, 22, -30) },
-	{ pos = Vector3.new( 55, 3.6, -30), house = HOUSES[2], signPos = Vector3.new( 55, 22, -46.5), signLook = Vector3.new( 55, 22, -30) },
-	{ pos = Vector3.new(-55, 3.6,  30), house = HOUSES[3], signPos = Vector3.new(-55, 22,  46.5), signLook = Vector3.new(-55, 22,  30) },
-	{ pos = Vector3.new( 55, 3.6,  30), house = HOUSES[4], signPos = Vector3.new( 55, 22,  46.5), signLook = Vector3.new( 55, 22,  30) },
+	{ pos = Vector3.new(-PAD_X, PAD_Y, -PAD_Z), house = HOUSES[1], signPos = Vector3.new(-PAD_X, SIGN_Y, -44), signLook = Vector3.new(-PAD_X, SIGN_Y, -PAD_Z) },
+	{ pos = Vector3.new( PAD_X, PAD_Y, -PAD_Z), house = HOUSES[2], signPos = Vector3.new( PAD_X, SIGN_Y, -44), signLook = Vector3.new( PAD_X, SIGN_Y, -PAD_Z) },
+	{ pos = Vector3.new(-PAD_X, PAD_Y,  PAD_Z), house = HOUSES[3], signPos = Vector3.new(-PAD_X, SIGN_Y,  44), signLook = Vector3.new(-PAD_X, SIGN_Y,  PAD_Z) },
+	{ pos = Vector3.new( PAD_X, PAD_Y,  PAD_Z), house = HOUSES[4], signPos = Vector3.new( PAD_X, SIGN_Y,  44), signLook = Vector3.new( PAD_X, SIGN_Y,  PAD_Z) },
 }
 
 local ARENA_CENTERS = {
